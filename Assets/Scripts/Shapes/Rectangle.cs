@@ -4,6 +4,8 @@ using UnityEditor;
 public class Rectangle : Shape, IShape
 {
     public Vector3 rectangleSize;
+    private Vector3[] frontSquare;
+    private Vector3[] backSquare;
 
     public void Render(bool gizMode)
     {
@@ -18,79 +20,63 @@ public class Rectangle : Shape, IShape
         if (this.camera != null)
             GL.LoadProjectionMatrix(this.camera.projectionMatrix);
 
-        Vector3[] vertices =
+        GenerateVertices();
+        ProjectAndTranslate();
+        RenderEdges(gizMode);
+        
+        GL.End();
+        GL.PopMatrix();
+    }
+
+    private void GenerateVertices()
+    {
+        frontSquare = new Vector3[4];
+        backSquare = new Vector3[4];
+        
+        Vector3[] baseVertices =
         {
-            new Vector3(1f, 1f, 0f), // tr
+            new Vector3(1f, 1f, 0f),
             new Vector3(-1f, 1f, 0f),
             new Vector3(-1f, -1f, 0f),
             new Vector3(1f, -1f, 0f),
         };
         
-        Vector3[] frontSquare = new Vector3[4];
-        Vector3[] backSquare = new Vector3[4];
-        
-        vertices[0].x += this.rectangleSize.x * .5f;
-        vertices[1].x -= this.rectangleSize.x * .5f;
-        vertices[2].x -= this.rectangleSize.x * .5f;
-        vertices[3].x += this.rectangleSize.x * .5f;
-        
-        vertices[0].y += this.rectangleSize.y * .5f;
-        vertices[1].y += this.rectangleSize.y * .5f;
-        vertices[2].y -= this.rectangleSize.y * .5f;
-        vertices[3].y -= this.rectangleSize.y * .5f;
-        
-        for (int i = 0; i < vertices.Length; i++)
-            frontSquare[i] = vertices[i];
-        for (int i = 0; i < vertices.Length; i++)
-            backSquare[i] = vertices[i];
-        
-        for (int i = 0; i < backSquare.Length; i++)
+        for (int i = 0; i < baseVertices.Length; i++)
         {
-            Vector3 vertex = backSquare[i];
+            baseVertices[i].x *= rectangleSize.x * 0.5f;
+            baseVertices[i].y *= rectangleSize.y * 0.5f;
             
-            vertex.z -= this.rectangleSize.z;
-            backSquare[i] = vertex;
+            frontSquare[i] = baseVertices[i];
+            backSquare[i] = baseVertices[i];
+            backSquare[i].z -= rectangleSize.z;
         }
-        
-        // project and translate
-        for (int i = 0; i < frontSquare.Length; i++)
-            frontSquare[i] = VectorCalculations.Project(VectorCalculations.Translate(frontSquare[i], this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
-        
-        for (int i = 0; i < backSquare.Length; i++)
-            backSquare[i] = VectorCalculations.Project(VectorCalculations.Translate(backSquare[i], this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
-        
-        // render
+    }
+
+    private void ProjectAndTranslate()
+    {
         for (int i = 0; i < frontSquare.Length; i++)
         {
-            int j = i + 1;
-            if (j >= frontSquare.Length) j = 0;
+            frontSquare[i] = VectorCalculations.Project(VectorCalculations.Translate(frontSquare[i], this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
+            backSquare[i] = VectorCalculations.Project(VectorCalculations.Translate(backSquare[i], this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
+        }
+    }
+    
+    private void RenderEdges(bool gizMode)
+    {
+        for (int i = 0; i < frontSquare.Length; i++)
+        {
+            int next = (i + 1) % frontSquare.Length;
             
-            Vector3 tV1 = frontSquare[i];
-            Vector3 tV2 = frontSquare[j];
-            
-            Vector3 bV1 = backSquare[i];
-            Vector3 bV2 = backSquare[j];
+            DrawLine(frontSquare[i], frontSquare[next], gizMode);
+            DrawLine(backSquare[i], backSquare[next], gizMode);
+            DrawLine(frontSquare[i], backSquare[i], gizMode);
 
             if (gizMode)
             {
-                Handles.Label(tV1, $"FV{i}");
-                Handles.Label(bV1, $"BV{i}");
+                Handles.Label(frontSquare[i], $"FV{i}");
+                Handles.Label(backSquare[i], $"BV{i}");
             }
-            DrawLine(tV1, tV2, gizMode);
-            DrawLine(bV1, bV2, gizMode);
         }
-        
-        // connect
-        for (int i = 0; i < frontSquare.Length; i++)
-        {
-            Vector3 tVertex = frontSquare[i];
-            Vector3 bVertex = backSquare[i];
-            
-            DrawLine(tVertex, bVertex, gizMode);
-        }
-        
-        GL.End();
-        GL.PopMatrix();
     }
 
     public void DrawLine(Vector3 v1, Vector3 v2, bool gizMode)

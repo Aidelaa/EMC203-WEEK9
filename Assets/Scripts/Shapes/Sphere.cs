@@ -19,33 +19,27 @@ public class Sphere : Shape, IShape
         if (this.camera != null)
             GL.LoadProjectionMatrix(this.camera.projectionMatrix);
 
-        // draw multiple circles
-        
-        List<List<Vector3>> vertices = new List<List<Vector3>>();
-        
+        // List of circles forming the sphere
+        List<List<Vector3>> circles = new List<List<Vector3>>();
+
         for (int i = 0; i < this.segments; i++)
         {
-            float theta = Mathf.PI * (i / this.segments);
+            float theta = Mathf.PI * (i / this.segments); // Vertical angle
             float y = Mathf.Cos(theta) * this.size;
             float r = Mathf.Sin(theta) * this.size;
 
-            vertices.Add(DrawCircle(r, y, this.segments, gizMode));
+            circles.Add(DrawCircle(r, y, gizMode));
         }
 
-        for (int i = 0; i < vertices.Count; i++)
+        // Connect circles to create vertical lines
+        for (int i = 0; i < circles.Count - 1; i++) 
         {
-            int j = i + 1;
-            if (j == vertices.Count) j -= 1;
+            List<Vector3> bottomCircle = circles[i];
+            List<Vector3> topCircle = circles[i + 1];
 
-            List<Vector3> bVertex = vertices[i];
-            List<Vector3> tNormal = vertices[j];
-            
-            for (int l = 0; l < bVertex.Count; l++)
+            for (int j = 0; j < bottomCircle.Count; j++)
             {
-                Vector3 v1 = bVertex[l];
-                Vector3 v2 = tNormal[l];
-                
-                DrawLine(v1, v2, gizMode);
+                DrawLine(bottomCircle[j], topCircle[j], gizMode);
             }
         }
 
@@ -53,33 +47,34 @@ public class Sphere : Shape, IShape
         GL.PopMatrix();
     }
 
-    public List<Vector3> DrawCircle(float radi, float yRadi, float quality, bool gizMode)
+    public List<Vector3> DrawCircle(float radius, float yLevel, bool gizMode)
     {
         List<Vector3> vertices = new List<Vector3>();
-        Vector3 lastPoint = Vector3.zero;
+        float angleStep = (Mathf.PI * 2) / this.segments;
+        
         Vector3 firstPoint = Vector3.zero;
-        
-        Vector3 startingVertex = Vector3.zero;
-        Vector3 endingVertex = Vector3.zero;
-        
+        Vector3 prevPoint = Vector3.zero;
+
         for (int i = 0; i < this.segments; i++)
         {
-            int a = i;
-            if (i >= this.segments) a = 0;
-                
-            float angle = (Mathf.PI * 2) * a / this.segments;
-            float nextAngle = (Mathf.PI * 2) * (a+1) / this.segments;
+            float angle = i * angleStep;
+            Vector3 currentPoint = new Vector3(Mathf.Cos(angle) * radius, yLevel, Mathf.Sin(angle) * radius);
+
+            // Apply transformations
+            currentPoint = VectorCalculations.Project(
+                VectorCalculations.Translate(currentPoint, this.center, this.rotation), 
+                this.innerFocalLength, this.center.z, this.size
+            );
+
+            if (i > 0) DrawLine(prevPoint, currentPoint, gizMode);
             
-            startingVertex = new Vector3(Mathf.Cos(angle) * radi, yRadi, Mathf.Sin(angle) * radi);
-            endingVertex = new Vector3(Mathf.Cos(nextAngle) * radi, yRadi, Mathf.Sin(nextAngle) * radi);
-            
-            startingVertex = VectorCalculations.Project(VectorCalculations.Translate(startingVertex, this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
-            endingVertex = VectorCalculations.Project(VectorCalculations.Translate(endingVertex, this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
-            DrawLine(startingVertex, endingVertex, gizMode);
-            
-            vertices.Add(startingVertex);
-            // Handles.Label(startingVertex, $"V:{i}.{startingVertex.y:0.0}");
+            if (i == 0) firstPoint = currentPoint; // Store first vertex
+            prevPoint = currentPoint;
+            vertices.Add(currentPoint);
         }
+
+        // Close the circle by connecting the last point to the first
+        DrawLine(prevPoint, firstPoint, gizMode);
 
         return vertices;
     }
@@ -92,8 +87,9 @@ public class Sphere : Shape, IShape
         GL.Vertex3(v1.x, v1.y, v1.z);
         GL.Vertex3(v2.x, v2.y, v2.z);
     }
-    
-    public override void OnDrawGizmos() {
+
+    public override void OnDrawGizmos() 
+    {
         if (!this.enabled) return;
         Render(true);
     }
