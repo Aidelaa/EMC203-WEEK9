@@ -21,7 +21,7 @@ public class Rectangle : Shape, IShape
             GL.LoadProjectionMatrix(this.camera.projectionMatrix);
 
         GenerateVertices();
-        ProjectAndTranslate();
+        ApplyTransformations();
         RenderEdges(gizMode);
         
         GL.End();
@@ -33,31 +33,34 @@ public class Rectangle : Shape, IShape
         frontSquare = new Vector3[4];
         backSquare = new Vector3[4];
         
+        Vector3 halfSize = rectangleSize * 0.5f;
+        
         Vector3[] baseVertices =
         {
-            new Vector3(1f, 1f, 0f),
-            new Vector3(-1f, 1f, 0f),
-            new Vector3(-1f, -1f, 0f),
-            new Vector3(1f, -1f, 0f),
+            new Vector3(halfSize.x, halfSize.y, 0f),
+            new Vector3(-halfSize.x, halfSize.y, 0f),
+            new Vector3(-halfSize.x, -halfSize.y, 0f),
+            new Vector3(halfSize.x, -halfSize.y, 0f),
         };
         
         for (int i = 0; i < baseVertices.Length; i++)
         {
-            baseVertices[i].x *= rectangleSize.x * 0.5f;
-            baseVertices[i].y *= rectangleSize.y * 0.5f;
-            
             frontSquare[i] = baseVertices[i];
-            backSquare[i] = baseVertices[i];
-            backSquare[i].z -= rectangleSize.z;
+            backSquare[i] = baseVertices[i] - new Vector3(0, 0, rectangleSize.z);
         }
     }
 
-    private void ProjectAndTranslate()
+    private void ApplyTransformations()
     {
+        Quaternion rotationQuat = Quaternion.Euler(this.rotation);
+        
         for (int i = 0; i < frontSquare.Length; i++)
         {
-            frontSquare[i] = VectorCalculations.Project(VectorCalculations.Translate(frontSquare[i], this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
-            backSquare[i] = VectorCalculations.Project(VectorCalculations.Translate(backSquare[i], this.center, this.rotation), this.innerFocalLength, this.center.z, this.size);
+            frontSquare[i] = rotationQuat * frontSquare[i] + this.center;
+            backSquare[i] = rotationQuat * backSquare[i] + this.center;
+            
+            frontSquare[i] = VectorCalculations.Project(frontSquare[i], this.innerFocalLength, this.center.z, this.size);
+            backSquare[i] = VectorCalculations.Project(backSquare[i], this.innerFocalLength, this.center.z, this.size);
         }
     }
     
