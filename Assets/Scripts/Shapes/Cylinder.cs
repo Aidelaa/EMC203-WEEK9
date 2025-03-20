@@ -9,23 +9,26 @@ public class Cylinder : Shape, IShape
 
     public void Render(bool gizMode)
     {
-        if (!material) return;
-
+        if (!this.material) return;
+        
         GL.PushMatrix();
         GL.Begin(GL.LINES);
-        material.SetPass(0);
+        this.material.SetPass(0);
 
         GL.Color(Color.green);
-        if (camera != null)
-            GL.LoadProjectionMatrix(camera.projectionMatrix);
+        
+        if (this.camera != null)
+            GL.LoadProjectionMatrix(this.camera.projectionMatrix);
 
-        List<Vector3> topVertices = GenerateCircleVertices(center.y + (height * 0.5f));
-        List<Vector3> bottomVertices = GenerateCircleVertices(center.y - (height * 0.5f));
+        List<Vector3> topVertices = GenerateCircleVertices(this.center.y + (this.height * 0.5f));
+        List<Vector3> bottomVertices = GenerateCircleVertices(this.center.y - (this.height * 0.5f));
 
-        ProjectVertices(topVertices);
-        ProjectVertices(bottomVertices);
+        ApplyRotation(ref topVertices);
+        ApplyRotation(ref bottomVertices);
 
-        // Render edges
+        ProjectVertices(ref topVertices);
+        ProjectVertices(ref bottomVertices);
+
         DrawEdges(topVertices, gizMode, "T");
         DrawEdges(bottomVertices, gizMode, "B");
         ConnectCircles(topVertices, bottomVertices, gizMode);
@@ -37,28 +40,33 @@ public class Cylinder : Shape, IShape
     private List<Vector3> GenerateCircleVertices(float yPosition)
     {
         List<Vector3> vertices = new List<Vector3>();
-        float angleStep = (360f / segments) * Mathf.Deg2Rad;
+        float angleStep = (360 / this.segments) * Mathf.Deg2Rad;
         
-        for (int i = 0; i < segments; i++)
+        for (int i = 0; i < this.segments; i++)
         {
             Vector3 vertex = new Vector3(
-                Mathf.Cos(angleStep * i) * size,
+                Mathf.Cos(angleStep * i) * this.size,
                 yPosition,
-                Mathf.Sin(angleStep * i) * size
+                Mathf.Sin(angleStep * i) * this.size
             );
-
-            vertex = VectorCalculations.Translate(vertex, center, rotation);
             vertices.Add(vertex);
         }
-        
         return vertices;
     }
 
-    private void ProjectVertices(List<Vector3> vertices)
+    private void ApplyRotation(ref List<Vector3> vertices)
     {
         for (int i = 0; i < vertices.Count; i++)
         {
-            vertices[i] = VectorCalculations.Project(vertices[i], innerFocalLength, center.z, size);
+            vertices[i] = Quaternion.Euler(rotation) * (vertices[i] - center) + center;
+        }
+    }
+
+    private void ProjectVertices(ref List<Vector3> vertices)
+    {
+        for (int i = 0; i < vertices.Count; i++)
+        {
+            vertices[i] = VectorCalculations.Project(vertices[i], this.innerFocalLength, this.center.z, this.size);
         }
     }
 
@@ -89,14 +97,14 @@ public class Cylinder : Shape, IShape
     {
         if (gizMode)
             Gizmos.DrawLine(v1, v2);
-
+        
         GL.Vertex3(v1.x, v1.y, v1.z);
         GL.Vertex3(v2.x, v2.y, v2.z);
     }
     
     public override void OnDrawGizmos() 
     {
-        if (!enabled) return;
+        if (!this.enabled) return;
         Render(true);
     }
 
