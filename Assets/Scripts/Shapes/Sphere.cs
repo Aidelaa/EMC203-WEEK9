@@ -5,6 +5,7 @@ using UnityEditor;
 public class Sphere : Shape, IShape
 {
     [Range(5f, 50f)] public float segments;
+    [Range(5f, 50f)] public float rings;
 
     public void Render(bool gizMode)
     {
@@ -19,76 +20,76 @@ public class Sphere : Shape, IShape
         if (this.camera != null)
             GL.LoadProjectionMatrix(this.camera.projectionMatrix);
 
-        // List of circles forming the sphere
         List<List<Vector3>> circles = new List<List<Vector3>>();
 
-        for (int i = 0; i < this.segments; i++)
+        // Generate horizontal rings (latitude lines)
+        for (int i = 1; i < rings; i++)
         {
-            float theta = Mathf.PI * (i / this.segments); // Vertical angle
+            float theta = Mathf.PI * (i / rings);
             float y = Mathf.Cos(theta) * this.size;
             float r = Mathf.Sin(theta) * this.size;
 
-            circles.Add(DrawCircle(r, y, gizMode));
+            circles.Add(CreateCircle(r, y, gizMode));
         }
 
-        // Connect circles to create vertical lines
-        for (int i = 0; i < circles.Count - 1; i++) 
-        {
-            List<Vector3> bottomCircle = circles[i];
-            List<Vector3> topCircle = circles[i + 1];
-
-            for (int j = 0; j < bottomCircle.Count; j++)
-            {
-                DrawLine(bottomCircle[j], topCircle[j], gizMode);
-            }
-        }
+        // Generate vertical segments (longitude lines)
+        CreateLongitudeLines(circles, gizMode);
 
         GL.End();
         GL.PopMatrix();
     }
 
-    public List<Vector3> DrawCircle(float radius, float yLevel, bool gizMode)
+    private List<Vector3> CreateCircle(float radius, float yLevel, bool gizMode)
     {
         List<Vector3> vertices = new List<Vector3>();
-        float angleStep = (Mathf.PI * 2) / this.segments;
-        
-        Vector3 firstPoint = Vector3.zero;
-        Vector3 prevPoint = Vector3.zero;
+        float angleStep = (Mathf.PI * 2) / segments;
+        Vector3 firstPoint = Vector3.zero, prevPoint = Vector3.zero;
 
-        for (int i = 0; i < this.segments; i++)
+        for (int i = 0; i <= segments; i++)
         {
             float angle = i * angleStep;
             Vector3 currentPoint = new Vector3(Mathf.Cos(angle) * radius, yLevel, Mathf.Sin(angle) * radius);
-
-            // Apply transformations
-            currentPoint = VectorCalculations.Project(
-                VectorCalculations.Translate(currentPoint, this.center, this.rotation), 
-                this.innerFocalLength, this.center.z, this.size
-            );
+            currentPoint = ApplyTransformations(currentPoint);
 
             if (i > 0) DrawLine(prevPoint, currentPoint, gizMode);
-            
-            if (i == 0) firstPoint = currentPoint; // Store first vertex
+            if (i == 0) firstPoint = currentPoint;
+
             prevPoint = currentPoint;
             vertices.Add(currentPoint);
         }
 
-        // Close the circle by connecting the last point to the first
         DrawLine(prevPoint, firstPoint, gizMode);
-
         return vertices;
+    }
+
+    private void CreateLongitudeLines(List<List<Vector3>> circles, bool gizMode)
+    {
+        int segmentsCount = circles[0].Count;
+        for (int i = 0; i < segmentsCount; i++)
+        {
+            for (int j = 0; j < circles.Count - 1; j++)
+            {
+                DrawLine(circles[j][i], circles[j + 1][i], gizMode);
+            }
+        }
+    }
+
+    private Vector3 ApplyTransformations(Vector3 point)
+    {
+        return VectorCalculations.Project(
+            VectorCalculations.Translate(point, this.center, this.rotation), 
+            this.innerFocalLength, this.center.z, this.size
+        );
     }
 
     public void DrawLine(Vector3 v1, Vector3 v2, bool gizMode)
     {
-        if (gizMode)
-            Gizmos.DrawLine(v1, v2);
-        
+        if (gizMode) Gizmos.DrawLine(v1, v2);
         GL.Vertex3(v1.x, v1.y, v1.z);
         GL.Vertex3(v2.x, v2.y, v2.z);
     }
 
-    public override void OnDrawGizmos() 
+    public override void OnDrawGizmos()
     {
         if (!this.enabled) return;
         Render(true);
